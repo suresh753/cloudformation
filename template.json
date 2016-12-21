@@ -1,0 +1,315 @@
+{
+"Description": "Creation of LMS Environment",
+"Parameters" : {
+    "KeyPair" : {
+      "Description" : "The EC2 Key Pair to allow ssh access to instance",
+      "Type": "AWS::EC2::KeyPair::KeyName",
+      "ConstraintDescription" : "Can contain only ASCII characters."
+    }
+  },
+"Mappings" : {
+    "RegionMap" : {
+      "us-east-1"      : {"AMI" : "ami-b73b63a0","Zone" : "us-east-1b"},
+      "us-east-2"      : {"AMI" : "ami-58277d3d","Zone" : "us-east-2b"},
+      "us-west-1"      : {"AMI" : "ami-23e8a343","Zone" : "us-west-1b"},
+      "us-west-2"      : {"AMI" : "ami-5ec1673e","Zone" : "us-west-2b"},
+      "ca-central-1"   : {"AMI" : "ami-b48b39d0","Zone" : "ca-central-1b"},
+      "eu-west-1"      : {"AMI" : "ami-9398d3e0","Zone" : "eu-west-1b"},
+      "eu-central-1"   : {"AMI" : "ami-f9619996","Zone" : "eu-central-1b"},
+      "eu-west-2"      : {"AMI" : "ami-d6cbc1b2","Zone" : "eu-west-2b"},
+      "ap-southeast-1" : {"AMI" : "ami-b953f2da","Zone" : "ap-southeast-1b"},
+      "ap-southeast-2" : {"AMI" : "ami-db704cb8","Zone" : "ap-southeast-2b"},
+      "ap-northeast-2" : {"AMI" : "ami-983ce8f6","Zone" : "ap-northeast-2a"},
+      "ap-northeast-1" : {"AMI" : "ami-0c11b26d","Zone" : "ap-northeast-1a"},
+      "ap-south-1"     : {"AMI" : "ami-34b4c05b","Zone" : "ap-south-1b"},
+      "sa-east-1"      : {"AMI" : "ami-97831ffb","Zone" : "sa-east-1a"}
+                }
+  },
+"Resources": {
+ "JenkinsServer": {
+    "Type": "AWS::EC2::Instance",
+    "Metadata" : {
+        "Comment1" : "Configure the bootstrap helpers to install git,jenkins and puppetmaster",
+        "Comment2" : "Ensure jenkins is running in background",
+        "Comment3" : "Ensure puppetmaster is running in background",
+        
+        "AWS::CloudFormation::Init" : {
+          "configSets" : {
+							"Install" : [ "Install" ]
+						 },
+          "Install" : {
+				"packages" : {
+					"yum" : {               
+						"git"    : [],
+						"jenkins" : [],
+						"puppet-server" : [] 
+							}
+							},
+				"services" : {
+						"sysvinit" : {  
+							"jenkins"   : { "enabled" : "true", "ensureRunning" : "true" },
+							"puppetmaster"   : { "enabled" : "true", "ensureRunning" : "true" }
+									 }
+							}
+					}
+									}
+          },
+    "Properties": {
+		"ImageId": {
+		            "Fn::FindInMap" : ["RegionMap",{"Ref":"AWS::Region"},"AMI"]
+	              },
+        "InstanceType": "t2.micro",
+        "AvailabilityZone" : {
+							 "Fn::FindInMap" : ["RegionMap",{"Ref":"AWS::Region"},"Zone"]
+						     },
+        "UserData" : { "Fn::Base64" : { "Fn::Join" : ["", [
+			      "#!/bin/bash -xe\n",
+			      "sudo su -\n",
+			      "yum install -y aws-cfn-bootstrap\n",
+			      
+			      "wget -O /etc/yum.repos.d/jenkins.repo http://pkg.jenkins-ci.org/redhat-stable/jenkins.repo\n",
+			      "rpm --import https://jenkins-ci.org/redhat/jenkins-ci.org.key\n",
+			      
+			      "/opt/aws/bin/cfn-init -v",
+                  "    --stack ", { "Ref" : "AWS::StackName" },
+                  "    --resource JenkinsServer ",
+                  "    --configsets Install ",
+                  "    --region ", { "Ref" : "AWS::Region" }, "\n"
+		      ]]
+		      }
+	      },
+        "KeyName": {
+          "Ref":"KeyPair"
+        },
+        "SecurityGroups": [
+          {
+            "Ref": "InstanceSecurityGroup"
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "Jenkins Server"
+          }
+        ]    
+  }
+},
+  "Webserver1": {
+    "Type": "AWS::EC2::Instance",
+    "Metadata" : {
+        "Comment1" : "Configure the bootstrap helpers to install git and puppetagent",
+        "Comment2" : "Ensure jenkins is running in background",
+        "Comment3" : "Ensure puppetagent is running in background",
+        
+        "AWS::CloudFormation::Init" : {
+          "configSets" : {
+							"Install" : [ "Install" ]
+						 },
+          "Install" : {
+				"packages" : {
+					"yum" : {               
+						"git"    : [],
+						"puppet" : [] 
+							}
+							},
+				"services" : {
+						"sysvinit" : {  
+							"puppet"   : { "enabled" : "true", "ensureRunning" : "true" }
+									 }
+							}
+					}
+									}
+          },
+    "Properties": {
+		"ImageId": {
+		            "Fn::FindInMap" : ["RegionMap",{"Ref":"AWS::Region"},"AMI"]
+	              },
+        "InstanceType": "t2.micro",
+        "AvailabilityZone" : {
+							 "Fn::FindInMap" : ["RegionMap",{"Ref":"AWS::Region"},"Zone"]
+						     },
+        "UserData" : { "Fn::Base64" : { "Fn::Join" : ["", [
+			      "#!/bin/bash -xe\n",
+			      "sudo su -\n",
+			      "yum install -y aws-cfn-bootstrap\n",
+			  
+			      "/opt/aws/bin/cfn-init -v",
+                  "    --stack ", { "Ref" : "AWS::StackName" },
+                  "    --resource Webserver1 ",
+                  "    --configsets Install ",
+                  "    --region ", { "Ref" : "AWS::Region" }, "\n"
+		      ]]
+		      }
+	      },
+        "KeyName": {
+          "Ref":"KeyPair"
+        },
+        "SecurityGroups": [
+          {
+            "Ref": "InstanceSecurityGroup"
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "Webserver1"
+          }
+        ]    
+  }
+},
+
+"Webserver2": {
+    "Type": "AWS::EC2::Instance",
+    "Metadata" : {
+        "Comment1" : "Configure the bootstrap helpers to install git and puppetagent",
+        "Comment2" : "Ensure jenkins is running in background",
+        "Comment3" : "Ensure puppetagent is running in background",
+        
+        "AWS::CloudFormation::Init" : {
+          "configSets" : {
+							"Install" : [ "Install" ]
+						 },
+          "Install" : {
+				"packages" : {
+					"yum" : {               
+						"git"    : [],
+						"puppet" : [] 
+							}
+							},
+				"services" : {
+						"sysvinit" : {  
+							"puppet"   : { "enabled" : "true", "ensureRunning" : "true" }
+									 }
+							}
+					}
+									}
+          },
+    "Properties": {
+		"ImageId": {
+		            "Fn::FindInMap" : ["RegionMap",{"Ref":"AWS::Region"},"AMI"]
+	              },
+        "InstanceType": "t2.micro",
+        "AvailabilityZone" : {
+							 "Fn::FindInMap" : ["RegionMap",{"Ref":"AWS::Region"},"Zone"]
+						     },
+        "UserData" : { "Fn::Base64" : { "Fn::Join" : ["", [
+			      "#!/bin/bash -xe\n",
+			      "sudo su -\n",
+			      "yum install -y aws-cfn-bootstrap\n",
+			  
+			      "/opt/aws/bin/cfn-init -v",
+                  "    --stack ", { "Ref" : "AWS::StackName" },
+                  "    --resource Webserver2 ",
+                  "    --configsets Install ",
+                  "    --region ", { "Ref" : "AWS::Region" }, "\n"
+		      ]]
+		      }
+	      },
+        "KeyName": {
+          "Ref":"KeyPair"
+        },
+        "SecurityGroups": [
+          {
+            "Ref": "InstanceSecurityGroup"
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "Webserver2"
+          }
+        ]    
+  }
+},
+	"InstanceSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "Enabling ports 22,80,8080,3306,8140,443",
+        "SecurityGroupIngress": [
+          {
+            "IpProtocol": "tcp","FromPort": "22","ToPort": "22","CidrIp": "0.0.0.0/0"
+          },
+          {
+            "IpProtocol": "tcp","FromPort": "80","ToPort": "80","CidrIp": "0.0.0.0/0"
+          },
+          {
+            "IpProtocol": "tcp","FromPort": "8080","ToPort": "8080","CidrIp": "0.0.0.0/0"
+          },
+          {
+            "IpProtocol": "tcp","FromPort": "3306","ToPort": "3306","CidrIp": "0.0.0.0/0"
+          },
+          {
+            "IpProtocol": "tcp","FromPort": "8140","ToPort": "8140","CidrIp": "0.0.0.0/0"
+          },
+          {
+            "IpProtocol": "icmp","FromPort": "-1","ToPort": "-1","CidrIp": "0.0.0.0/0"
+          },
+          {
+            "IpProtocol": "tcp","FromPort": "443","ToPort": "443","CidrIp": "0.0.0.0/0"
+          }
+        ]
+      }
+    }
+},
+"Outputs": {
+    "GenkinsInstanceId": {
+      "Description": "InstanceId of Jenkins Server",
+      "Value": {
+                 "Ref": "JenkinsServer"
+               }
+    },
+    "GenkinsPrivateIp": {
+      "Description": "PrivateIp of Jenkins Server",
+      "Value": {
+               "Fn::GetAtt" : [ "JenkinsServer" , "PrivateIp" ]
+               }
+    },
+    "GenkinsPublicIp": {
+      "Description": "PublicIp of Jenkins Server",
+      "Value": {
+               "Fn::GetAtt" : [ "JenkinsServer" , "PublicIp" ]
+               }
+    },
+    "JenkinsURL" : {
+      "Description" : "URL for newly created Jenkins Server",
+      "Value" : { "Fn::Join" : ["", ["http://", { "Fn::GetAtt" : [ "JenkinsServer" , "PublicIp" ]} ,":8080"]] }
+    },
+    "WebserverOneInstanceId": {
+      "Description": "InstanceId of the Webserver 1",
+      "Value": {
+               "Ref": "Webserver1"
+               }
+    },
+    "WebserverOnePrivateIp": {
+      "Description": "PrivateIp of Webserver1 ",
+      "Value": {
+               "Fn::GetAtt" : [ "Webserver1" , "PrivateIp" ]
+               }
+    },
+    "WebserverOnePublicIp": {
+      "Description": "PublicIp of Webserver1",
+      "Value": {
+               "Fn::GetAtt" : [ "Webserver1" , "PublicIp" ]
+               }
+    },
+    "WebserverTwoInstanceId": {
+      "Description": "InstanceId of the Webserver 2",
+      "Value": {
+                "Ref": "Webserver2"
+               }
+    },
+    "WebserverTwoPrivateIp": {
+      "Description": "PrivateIp of Webserver2",
+      "Value": {
+              "Fn::GetAtt" : [ "Webserver2" , "PrivateIp" ]
+               }
+    },
+    "WebserverTwoPublicIp": {
+      "Description": "PublicIp of Webserver2",
+      "Value": {
+               "Fn::GetAtt" : [ "Webserver2" , "PublicIp" ]
+               }
+    }
+ }
+	
+}
